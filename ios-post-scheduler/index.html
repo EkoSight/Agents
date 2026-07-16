@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>Soil Doctor - Post Scheduler Agent</title>
+  
+  <!-- PWA Manifest & iOS Support -->
+  <link rel="manifest" href="manifest.json">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Soil Scheduler">
+  <link rel="apple-touch-icon" href="assets/icon.jpg">
+  
+  <!-- Stylesheets -->
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+  <!-- Background decorative glows -->
+  <div class="ambient-glow-1"></div>
+  <div class="ambient-glow-2"></div>
+
+  <!-- iOS-Style In-App Slide-Down Notification Banner -->
+  <div id="toast-notification" class="toast-notification">
+    <div class="toast-icon">⏰</div>
+    <div class="toast-text">
+      <div id="toast-title" class="toast-title">Scheduled Reminder</div>
+      <div id="toast-body" class="toast-body">Hey Dhiraj, ready to schedule a LinkedIn post? Click to draft.</div>
+    </div>
+    <div class="toast-close">×</div>
+  </div>
+
+  <!-- Main App Frame -->
+  <div class="app-container">
+    
+    <!-- Large Title iOS Header -->
+    <header>
+      <div class="header-title-container">
+        <p>Ekosight Technologies</p>
+        <h1>Soil Doctor Agent</h1>
+      </div>
+      <!-- Placeholder image or avatar -->
+      <img src="assets/icon.jpg" alt="Dhiraj" class="avatar">
+    </header>
+
+    <!-- Scrollable Content Area -->
+    <main>
+      
+      <!-- ================= SCHEDULER TAB ================= -->
+      <div id="scheduler-tab" class="tab-content active">
+        <!-- Reminder Status Ribbon -->
+        <div class="ios-card" style="padding: 12px 16px; background: rgba(52, 199, 89, 0.08); border-color: rgba(52, 199, 89, 0.15); display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px;">
+          <div style="font-size: 13px; font-weight: 500; display: flex; align-items: center; gap: 8px;">
+            <span>🟢</span> 
+            <span>Agent Active • Daily alert at <strong class="display-reminder-time">09:00</strong> (<span class="display-reminder-mode">Smart</span>)</span>
+          </div>
+        </div>
+
+        <div class="ios-card">
+          <div class="ios-card-header">
+            <h2 class="ios-card-title">📝 Theme Templates</h2>
+            <span style="font-size: 11px; color: var(--text-muted);">Pick to start</span>
+          </div>
+          <div class="ios-card-subtitle">Select a topic from your LinkedIn profile to pre-fill the post.</div>
+          
+          <div class="templates-grid" id="templates-grid">
+            <!-- Loaded dynamically in app.js -->
+          </div>
+        </div>
+
+        <div class="ios-card">
+          <div class="ios-card-header">
+            <h2 class="ios-card-title">✍️ Post Workspace</h2>
+          </div>
+          <div class="editor-container">
+            <textarea id="post-editor" class="editor-textarea" placeholder="Start typing or select a template above..."></textarea>
+            <div class="char-counter" id="char-count">0 characters</div>
+            <button id="gpt-generate-btn" class="ios-btn ios-btn-gpt" style="margin-bottom: 10px;">
+              <span>🤖 Generate with Custom GPT</span>
+            </button>
+            <button id="copy-publish-btn" class="ios-btn ios-btn-accent">
+              <span>📋 Copy & Log Publication</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="ios-card">
+          <div class="ios-card-header">
+            <h2 class="ios-card-title">⏳ Recent Postings</h2>
+          </div>
+          <div class="post-history-list" id="history-list">
+            <!-- Loaded dynamically in app.js -->
+          </div>
+        </div>
+      </div>
+
+      <!-- ================= REMINDERS TAB ================= -->
+      <div id="reminders-tab" class="tab-content">
+        <div class="ios-card">
+          <div class="ios-card-header">
+            <h2 class="ios-card-title">⚙️ Reminder Settings</h2>
+          </div>
+          <div class="ios-card-subtitle">Configure how and when the Soil Doctor Agent alerts you to draft and schedule posts.</div>
+          
+          <div class="ios-list">
+            <!-- Daily Reminders toggle -->
+            <div class="ios-list-row">
+              <span class="ios-list-label">🔔 Daily Reminders</span>
+              <label class="ios-switch">
+                <input type="checkbox" id="reminder-enable" checked>
+                <span class="ios-slider"></span>
+              </label>
+            </div>
+            
+            <!-- Self-Learning Mode toggle -->
+            <div class="ios-list-row">
+              <div>
+                <span class="ios-list-label">🧠 Self-Learning (Smart Mode)</span>
+                <span style="font-size: 11px; color: var(--text-muted); display: block; margin-top: 2px;">Reminds you during peak availability</span>
+              </div>
+              <label class="ios-switch">
+                <input type="checkbox" id="reminder-smart-mode" checked>
+                <span class="ios-slider"></span>
+              </label>
+            </div>
+            
+            <!-- Manual Time Picker Row -->
+            <div class="ios-list-row" id="manual-time-row">
+              <span class="ios-list-label">⏰ Manual Alert Time</span>
+              <input type="time" id="manual-reminder-time" class="ios-time-picker" value="09:00">
+            </div>
+
+            <!-- Sound feedback -->
+            <div class="ios-list-row">
+              <span class="ios-list-label">🔊 Alert Sounds</span>
+              <label class="ios-switch">
+                <input type="checkbox" id="sound-enable" checked>
+                <span class="ios-slider"></span>
+              </label>
+            </div>
+        </div>
+
+        <!-- ChatGPT Custom GPT Integration settings -->
+        <div class="ios-card">
+          <div class="ios-card-header">
+            <h2 class="ios-card-title">🤖 ChatGPT Integration</h2>
+          </div>
+          <div class="ios-card-subtitle">Connect with your Custom GPT to draft posts in your style.</div>
+          
+          <div class="ios-list">
+            <!-- Custom GPT toggle -->
+            <div class="ios-list-row">
+              <span class="ios-list-label">🔗 Enable Custom GPT</span>
+              <label class="ios-switch">
+                <input type="checkbox" id="gpt-enable" checked>
+                <span class="ios-slider"></span>
+              </label>
+            </div>
+            
+            <!-- Custom GPT link input -->
+            <div class="ios-list-row" style="flex-direction: column; align-items: stretch; gap: 8px;">
+              <span class="ios-list-label">🔗 Custom GPT Link URL</span>
+              <input type="url" id="gpt-url" class="editor-textarea" style="height: 40px; font-size: 13px; padding: 8px 12px;" placeholder="e.g. https://chatgpt.com/g/g-XXXXXX-name" value="https://chatgpt.com">
+            </div>
+
+            <!-- Custom prompt prefix -->
+            <div class="ios-list-row" style="flex-direction: column; align-items: stretch; gap: 8px; border-bottom: none;">
+              <span class="ios-list-label">💬 Custom Prompt Prefix</span>
+              <textarea id="gpt-prompt-prefix" class="editor-textarea" style="height: 80px; font-size: 13px; padding: 8px 12px;" placeholder="Instruct your GPT on the desired style and constraints..."></textarea>
+            </div>
+          </div>
+
+        <!-- Demonstration panel -->
+        <div class="ios-card">
+          <div class="ios-card-header">
+            <h2 class="ios-card-title">🧪 Agent Sandbox</h2>
+          </div>
+          <div class="ios-card-subtitle">Test the self-learning model & simulated notification banner immediately.</div>
+          <div style="display: flex; flex-direction: column; gap: 10px;">
+            <button id="simulate-alert-btn" class="ios-btn">
+              <span>🚀 Test Alert Notification</span>
+            </button>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+              <button id="inject-demo-btn" class="ios-btn ios-btn-secondary">
+                <span>📚 Load Demo History</span>
+              </button>
+              <button id="reset-learning-btn" class="ios-btn ios-btn-secondary ios-btn-danger" style="color: white;">
+                <span>🗑️ Reset Model</span>
+              </button>
+            </div>
+          </div>
+          <div id="audio-status" class="audio-status">🔇 Click anywhere on editor/settings to activate audio</div>
+        </div>
+
+        <!-- iOS Shortcuts Integration Guide -->
+        <div class="ios-card">
+          <div class="ios-card-header">
+            <h2 class="ios-card-title">📲 iPhone Standalone Guide</h2>
+          </div>
+          <div class="ios-card-subtitle">Since iOS blocks websites from scheduling alerts while closed, set up this 1-minute native automation:</div>
+          
+          <div class="shortcut-guide-step">
+            <div class="step-number">1</div>
+            <div class="step-text">Open the <strong>Shortcuts</strong> app on your iPhone and go to the <strong>Automation</strong> tab.</div>
+          </div>
+          <div class="shortcut-guide-step">
+            <div class="step-number">2</div>
+            <div class="step-text">Tap <strong>Create Personal Automation</strong> (or <strong>+</strong>) and choose <strong>Time of Day</strong>.</div>
+          </div>
+          <div class="shortcut-guide-step">
+            <div class="step-number">3</div>
+            <div class="step-text">Select <strong>Time of Day</strong> (e.g. daily at <strong><span class="display-reminder-time">09:00</span></strong>).</div>
+          </div>
+          <div class="shortcut-guide-step">
+            <div class="step-number">4</div>
+            <div class="step-text">Add Action: Search for <strong>Safari</strong> and select <strong>Open URLs</strong>. Set the URL to this app's hosted link.</div>
+          </div>
+          <div class="shortcut-guide-step">
+            <div class="step-number">5</div>
+            <div class="step-text">Turn OFF <strong>"Ask Before Running"</strong> to let it trigger silently. Now, your iPhone will wake up and prompt you precisely when the agent calculated!</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ================= INSIGHTS TAB ================= -->
+      <div id="insights-tab" class="tab-content">
+        <div class="ios-card">
+          <div class="insights-header">
+            <h2 style="font-size: 18px; font-weight: 600; margin-bottom: 4px;">Smart Model Status</h2>
+            <p style="font-size: 13px; color: var(--text-secondary);">Self-Learning Availability Calibration</p>
+          </div>
+          
+          <!-- Circular score gauge -->
+          <div class="smart-gauge-container">
+            <svg class="gauge-svg" width="140" height="140" viewBox="0 0 140 140">
+              <circle class="gauge-bg" cx="70" cy="70" r="60"></circle>
+              <circle id="gauge-dial" class="gauge-fill" cx="70" cy="70" r="60"></circle>
+            </svg>
+            <div class="gauge-text">
+              <div id="gauge-value" class="gauge-value">0%</div>
+              <div class="gauge-label">Confidence</div>
+            </div>
+          </div>
+          
+          <div id="insights-summary-text" style="font-size: 13px; line-height: 1.5; text-align: center; color: var(--text-secondary); padding: 0 10px;">
+            No scheduling activity logged yet. Start drafting or scheduling posts to train the engine.
+          </div>
+        </div>
+
+        <div class="ios-card">
+          <div class="ios-card-header">
+            <h2 class="ios-card-title">📊 Hourly Availability Scores</h2>
+          </div>
+          <div class="ios-card-subtitle">Activity profile indicating when you typically open the app and schedule posts:</div>
+          
+          <!-- Hourly score bar chart -->
+          <div class="chart-container" id="availability-chart">
+            <!-- Bars loaded in app.js -->
+          </div>
+          
+          <div style="display: flex; justify-content: space-between; margin-top: 12px; font-size: 11px; color: var(--text-muted);">
+            <span>Peak Activity Hours (Highlighted in Green)</span>
+            <span>Scale: Score weighting</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Debug logs panel -->
+      <div class="debug-panel">
+        <div class="debug-title">
+          <span>⚙️ System Logs</span>
+        </div>
+        <div class="debug-logs" id="debug-logs">Initializing console...</div>
+      </div>
+
+    </main>
+
+    <!-- Bottom iOS Tab Navigation Bar -->
+    <nav class="tab-bar">
+      <a class="tab-bar-item active" data-tab="scheduler">
+        <div class="tab-icon">📝</div>
+        <div class="tab-label">Scheduler</div>
+      </a>
+      <a class="tab-bar-item" data-tab="reminders">
+        <div class="tab-icon">⚙️</div>
+        <div class="tab-label">Settings</div>
+      </a>
+      <a class="tab-bar-item" data-tab="insights">
+        <div class="tab-icon">📊</div>
+        <div class="tab-label">Insights</div>
+      </a>
+    </nav>
+
+  </div>
+
+  <!-- Scripts -->
+  <script src="learning-engine.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
