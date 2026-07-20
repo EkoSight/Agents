@@ -1,9 +1,12 @@
-const CACHE_NAME = 'soil-doctor-scheduler-v1';
+const CACHE_NAME = 'soil-doctor-scheduler-v2';
 const ASSETS = [
   'index.html',
   'styles.css',
   'app.js',
+  'themes.js',
   'learning-engine.js',
+  'news-engine.js',
+  'vision-engine.js',
   'manifest.json',
   'assets/icon.jpg'
 ];

@@ -7,6 +7,7 @@
   
   <!-- PWA Manifest & iOS Support -->
   <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#131924">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Soil Scheduler">
@@ -60,10 +61,10 @@
         <div class="ios-card">
           <div class="ios-card-header">
             <h2 class="ios-card-title">📝 Theme Templates</h2>
-            <span style="font-size: 11px; color: var(--text-muted);">Pick to start</span>
+            <span id="templates-shuffle" style="font-size: 11px; color: var(--accent-color); cursor: pointer; font-weight: 600;">🔄 Shuffle</span>
           </div>
-          <div class="ios-card-subtitle">Select a topic from your LinkedIn profile to pre-fill the post.</div>
-          
+          <div class="ios-card-subtitle">Select a topic to pre-fill the post. Tap Shuffle for a fresh rotation, or pull trending topics from the Discover tab.</div>
+
           <div class="templates-grid" id="templates-grid">
             <!-- Loaded dynamically in app.js -->
           </div>
@@ -97,6 +98,18 @@
 
       <!-- ================= REMINDERS TAB ================= -->
       <div id="reminders-tab" class="tab-content">
+
+        <!-- Dynamic Appearance Theme Picker -->
+        <div class="ios-card">
+          <div class="ios-card-header">
+            <h2 class="ios-card-title">🎨 Appearance Theme</h2>
+          </div>
+          <div class="ios-card-subtitle">Pick a dynamic theme template — the whole app re-skins instantly and remembers your choice.</div>
+          <div class="theme-swatch-grid" id="theme-swatch-grid">
+            <!-- Loaded dynamically in app.js -->
+          </div>
+        </div>
+
         <div class="ios-card">
           <div class="ios-card-header">
             <h2 class="ios-card-title">⚙️ Reminder Settings</h2>
@@ -266,6 +279,54 @@
         </div>
       </div>
 
+      <!-- ================= DISCOVER TAB ================= -->
+      <div id="discover-tab" class="tab-content">
+
+        <!-- Agriculture News Explorer -->
+        <div class="ios-card">
+          <div class="ios-card-header">
+            <h2 class="ios-card-title">📰 Agri News & Trending Topics</h2>
+          </div>
+          <div class="ios-card-subtitle">Live agriculture headlines from India &amp; around the world, ranked by relevance to soil health, agritech &amp; IoT — your work areas float to the top.</div>
+
+          <div class="news-toolbar">
+            <button id="news-refresh-btn" class="ios-btn news-refresh-btn">
+              <span>🔄 Refresh Headlines</span>
+            </button>
+          </div>
+          <div class="news-status" id="news-status">
+            <span class="news-live-dot"></span>
+            <span id="news-status-text">Tap refresh to explore current agriculture news.</span>
+          </div>
+          <div class="news-list" id="news-list">
+            <!-- Loaded dynamically in app.js -->
+          </div>
+        </div>
+
+        <!-- Picture-based Topic Suggestions -->
+        <div class="ios-card">
+          <div class="ios-card-header">
+            <h2 class="ios-card-title">📸 Topics from Your Picture</h2>
+          </div>
+          <div class="ios-card-subtitle">Upload a photo (a field, soil sample, your team, an event) and the agent suggests post topics based on what it sees. Analysis runs fully on-device — your image never leaves the phone.</div>
+
+          <input type="file" id="image-input" accept="image/*" style="display: none;">
+          <div class="upload-dropzone" id="upload-dropzone">
+            <div class="upload-icon">🖼️</div>
+            <div class="upload-hint">Tap to upload or take a picture</div>
+            <div class="upload-subhint">JPG / PNG • analysed privately on your device</div>
+          </div>
+
+          <div class="upload-preview-wrap" id="upload-preview-wrap" style="display: none;">
+            <img id="upload-preview" class="upload-preview" alt="Uploaded preview">
+            <div class="vision-tags" id="vision-tags"></div>
+            <div style="font-size: 12px; color: var(--text-secondary); font-weight: 600; margin-bottom: 2px;">Suggested post topics:</div>
+            <div class="topic-chip-list" id="vision-topics"></div>
+          </div>
+        </div>
+
+      </div>
+
       <!-- Debug logs panel -->
       <div class="debug-panel">
         <div class="debug-title">
@@ -286,6 +347,10 @@
         <div class="tab-icon">⚙️</div>
         <div class="tab-label">Settings</div>
       </a>
+      <a class="tab-bar-item" data-tab="discover">
+        <div class="tab-icon">🔍</div>
+        <div class="tab-label">Discover</div>
+      </a>
       <a class="tab-bar-item" data-tab="insights">
         <div class="tab-icon">📊</div>
         <div class="tab-label">Insights</div>
@@ -295,7 +360,10 @@
   </div>
 
   <!-- Scripts -->
+  <script src="themes.js"></script>
   <script src="learning-engine.js"></script>
+  <script src="news-engine.js"></script>
+  <script src="vision-engine.js"></script>
   <script src="app.js"></script>
 </body>
 </html>
