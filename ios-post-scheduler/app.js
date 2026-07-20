@@ -107,7 +107,7 @@ Technology earns adoption through relationships, not dashboards.
   }
 ];
 
-// The full rotating pool of dynamic theme templates.
+// The base pool of hand-written theme templates.
 const TEMPLATE_POOL = POST_TEMPLATES;
 // How many templates are visible in the grid at once.
 const TEMPLATES_VISIBLE = 4;
@@ -115,6 +115,14 @@ const TEMPLATES_VISIBLE = 4;
 let visibleTemplates = [];
 // Starting offset into the pool for rotation.
 let templateRotationOffset = 0;
+// Trending templates derived from Discover's news feed (front of the pool).
+let newsTemplates = [];
+const NEWS_TEMPLATES_KEY = 'soil_doctor_news_templates';
+
+// The live pool = trending news templates first, then the base templates.
+function getTemplatePool() {
+  return newsTemplates.concat(TEMPLATE_POOL);
+}
 
 // App State
 let appState = {
@@ -222,14 +230,23 @@ document.addEventListener('DOMContentLoaded', () => {
   }
   
   // Setup UI event listeners
+  // Load persisted tag library + trending templates before rendering the grid.
+  loadTagLibrary();
+  loadPersistedNewsTemplates();
+
   setupTabNavigation();
   setupTemplates();
   setupThemePicker();
   setupSettingsUI();
   setupSchedulerActions();
+  setupTagManager();
   setupInsightsUI();
   setupDiscoverUI();
   setupNotificationChecker();
+
+  // Refresh trending topics in the background so the Scheduler's theme
+  // templates stay current even before the user opens the Discover tab.
+  setTimeout(() => { loadNews(); }, 1200);
   
   // Log startup
   addLog('[Agent] Post Scheduler Agent initialized');
@@ -287,7 +304,7 @@ function switchTab(tabName) {
 
 // Pick the current rotating window of templates from the pool.
 function computeVisibleTemplates() {
-  const pool = TEMPLATE_POOL;
+  const pool = getTemplatePool();
   const n = Math.min(TEMPLATES_VISIBLE, pool.length);
   visibleTemplates = [];
   for (let i = 0; i < n; i++) {
@@ -307,7 +324,7 @@ function setupTemplates() {
   const shuffle = document.getElementById('templates-shuffle');
   if (shuffle) {
     shuffle.addEventListener('click', () => {
-      templateRotationOffset = (templateRotationOffset + TEMPLATES_VISIBLE) % TEMPLATE_POOL.length;
+      templateRotationOffset = (templateRotationOffset + TEMPLATES_VISIBLE) % getTemplatePool().length;
       computeVisibleTemplates();
       renderTemplatesGrid();
       addLog('[Templates] Shuffled dynamic theme templates');
@@ -320,9 +337,11 @@ function renderTemplatesGrid() {
   if (!grid) return;
 
   grid.innerHTML = visibleTemplates.map(t => `
-    <div class="template-item" data-id="${t.id}" id="tmpl-${t.id}">
+    <div class="template-item ${t.trending ? 'trending' : ''}" data-id="${t.id}" id="tmpl-${t.id}">
       <div class="template-item-title">${escapeHtml(t.title)}</div>
-      <div class="template-item-desc">${escapeHtml(t.theme)}</div>
+      <div class="template-item-desc">
+        ${t.trending ? '<span class="template-trending-badge">📰 Trending</span><br>' : ''}${escapeHtml(t.theme)}
+      </div>
     </div>
   `).join('');
 
@@ -341,8 +360,40 @@ function renderTemplatesGrid() {
   }
 }
 
+// Build trending theme templates from Discover's news topics and merge them
+// into the Scheduler pool so the topic list refreshes whenever news updates.
+function integrateNewsTopics(topics) {
+  if (!Array.isArray(topics) || topics.length === 0) return;
+  const defaultTags = getHashtagString(3);
+  newsTemplates = topics.slice(0, 4).map((t, i) => {
+    const full = t.title || '';
+    const title = full.length > 26 ? full.slice(0, 24).trim() + '…' : full;
+    return {
+      id: 'news-' + i,
+      title,
+      theme: 'Trending • ' + (t.region || 'Global'),
+      trending: true,
+      text: `${full}\n\n[Add your perspective on why this matters for soil health and the field.]\n\n${defaultTags}`
+    };
+  });
+  try { localStorage.setItem(NEWS_TEMPLATES_KEY, JSON.stringify(newsTemplates)); } catch (e) {}
+
+  // Surface trending templates at the front of the grid.
+  templateRotationOffset = 0;
+  computeVisibleTemplates();
+  renderTemplatesGrid();
+  addLog(`[Templates] Refreshed with ${newsTemplates.length} trending topics from news`);
+}
+
+function loadPersistedNewsTemplates() {
+  try {
+    const s = localStorage.getItem(NEWS_TEMPLATES_KEY);
+    newsTemplates = s ? JSON.parse(s) : [];
+  } catch (e) { newsTemplates = []; }
+}
+
 function selectTemplate(templateId) {
-  const template = TEMPLATE_POOL.find(t => t.id === templateId);
+  const template = getTemplatePool().find(t => t.id === templateId);
   if (!template) return;
   
   // Highlight active
@@ -402,6 +453,139 @@ function triggerGptForTopic(topicText) {
   addLog(`[GPT] Opening Custom GPT for topic: "${topicText.substring(0, 40)}..."`);
   window.open(deepLink, '_blank');
   showToastNotification('Opening ChatGPT...', 'Copy the generated post and paste it back to publish.');
+}
+
+// ================= TAGS & MENTIONS MANAGER =================
+const HASHTAGS_KEY = 'soil_doctor_hashtags';
+const MENTIONS_KEY = 'soil_doctor_mentions';
+const DEFAULT_HASHTAGS = ['SoilHealth', 'Agritech', 'SoilDoctor', 'Ekosight', 'PrecisionAgriculture'];
+const DEFAULT_MENTIONS = ['Ekosight'];
+let tagLibrary = { hashtags: [], mentions: [] };
+
+function loadTagLibrary() {
+  try {
+    const h = localStorage.getItem(HASHTAGS_KEY);
+    const m = localStorage.getItem(MENTIONS_KEY);
+    tagLibrary.hashtags = h ? JSON.parse(h) : DEFAULT_HASHTAGS.slice();
+    tagLibrary.mentions = m ? JSON.parse(m) : DEFAULT_MENTIONS.slice();
+  } catch (e) {
+    tagLibrary = { hashtags: DEFAULT_HASHTAGS.slice(), mentions: DEFAULT_MENTIONS.slice() };
+  }
+}
+
+function saveTagLibrary() {
+  localStorage.setItem(HASHTAGS_KEY, JSON.stringify(tagLibrary.hashtags));
+  localStorage.setItem(MENTIONS_KEY, JSON.stringify(tagLibrary.mentions));
+}
+
+// First n hashtags formatted like "#SoilHealth #Agritech #Ekosight".
+function getHashtagString(n) {
+  return tagLibrary.hashtags.slice(0, n).map(t => '#' + t).join(' ');
+}
+
+// Normalise a user-entered token: strip leading #/@ and spaces.
+function normalizeToken(value) {
+  return (value || '').trim().replace(/^[#@]+/, '').replace(/\s+/g, '');
+}
+
+function setupTagManager() {
+  loadTagLibrary();
+  renderTagLists();
+
+  const wire = (inputId, btnId, kind) => {
+    const input = document.getElementById(inputId);
+    const btn = document.getElementById(btnId);
+    if (!input || !btn) return;
+    const submit = () => {
+      const val = normalizeToken(input.value);
+      if (!val) return;
+      addTag(kind, val);
+      input.value = '';
+      input.focus();
+    };
+    btn.addEventListener('click', submit);
+    input.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); submit(); } });
+    input.addEventListener('focus', initAudio);
+  };
+
+  wire('hashtag-input', 'hashtag-add-btn', 'hashtags');
+  wire('mention-input', 'mention-add-btn', 'mentions');
+}
+
+function addTag(kind, value) {
+  const list = tagLibrary[kind];
+  if (list.some(t => t.toLowerCase() === value.toLowerCase())) {
+    addLog(`[Tags] "${value}" already in ${kind}`);
+    return;
+  }
+  list.push(value);
+  saveTagLibrary();
+  renderTagLists();
+  addLog(`[Tags] Added ${kind === 'hashtags' ? '#' : '@'}${value}`);
+}
+
+function removeTag(kind, value) {
+  tagLibrary[kind] = tagLibrary[kind].filter(t => t !== value);
+  saveTagLibrary();
+  renderTagLists();
+  addLog(`[Tags] Removed ${kind === 'hashtags' ? '#' : '@'}${value}`);
+}
+
+function renderTagLists() {
+  const build = (containerId, kind, cls, prefix) => {
+    const el = document.getElementById(containerId);
+    if (!el) return;
+    if (tagLibrary[kind].length === 0) {
+      el.innerHTML = `<span style="font-size:12px;color:var(--text-muted);">None yet — add one below.</span>`;
+      return;
+    }
+    el.innerHTML = tagLibrary[kind].map(t => `
+      <span class="tag-chip ${cls}" data-kind="${kind}" data-val="${escapeHtml(t)}">
+        <span class="tag-token">${prefix}${escapeHtml(t)}</span>
+        <span class="tag-remove" data-remove="1">×</span>
+      </span>`).join('');
+
+    el.querySelectorAll('.tag-chip').forEach(chip => {
+      chip.addEventListener('click', (e) => {
+        const val = chip.getAttribute('data-val');
+        if (e.target.getAttribute('data-remove')) {
+          e.stopPropagation();
+          removeTag(kind, val);
+        } else {
+          insertToken(prefix, val, chip);
+        }
+      });
+    });
+  };
+
+  build('hashtag-list', 'hashtags', 'hashtag', '#');
+  build('mention-list', 'mentions', 'mention', '@');
+}
+
+// Append a #tag or @mention to the post editor with tidy spacing.
+function insertToken(prefix, value, chipEl) {
+  const textarea = document.getElementById('post-editor');
+  if (!textarea) return;
+  const token = prefix + value;
+  let current = textarea.value;
+
+  // Avoid duplicate insertion of the same token.
+  if (new RegExp('(^|\\s)' + prefix + value + '(\\s|$)').test(current)) {
+    showToastNotification('Already added', `${token} is already in your post.`);
+    return;
+  }
+
+  if (current.length && !/\s$/.test(current)) current += ' ';
+  current += token + ' ';
+  textarea.value = current;
+  updateCharCount(current);
+  textarea.focus();
+
+  if (chipEl) {
+    chipEl.classList.add('inserted');
+    setTimeout(() => chipEl.classList.remove('inserted'), 600);
+  }
+  addLog(`[Tags] Inserted ${token} into post`);
 }
 
 // Update Character Count
@@ -485,7 +669,7 @@ function setupSchedulerActions() {
       
       // If textarea is empty, check if a template is selected
       if (!topic && appState.activeTemplateId) {
-        const template = POST_TEMPLATES.find(t => t.id === appState.activeTemplateId);
+        const template = getTemplatePool().find(t => t.id === appState.activeTemplateId);
         if (template) {
           topic = `Theme: ${template.title} (${template.theme})`;
         }
@@ -816,6 +1000,9 @@ async function loadNews() {
   }
   addLog(`[News] Loaded ${topics.length} topics (${live ? 'live' : 'fallback'})`);
 
+  // Keep the Scheduler's theme templates in sync with the latest trending topics.
+  integrateNewsTopics(topics);
+
   if (!topics.length) {
     list.innerHTML = '<div style="text-align:center;color:var(--text-muted);padding:16px;">No topics found. Try again later.</div>';
     return;
@@ -882,13 +1069,17 @@ function setupImageSuggestions() {
 async function analyzeUploadedImage(file) {
   const previewWrap = document.getElementById('upload-preview-wrap');
   const previewImg = document.getElementById('upload-preview');
+  const identifiedEl = document.getElementById('vision-identified');
   const tagsEl = document.getElementById('vision-tags');
   const topicsEl = document.getElementById('vision-topics');
+  const captionsEl = document.getElementById('vision-captions');
   const dropzone = document.getElementById('upload-dropzone');
   if (typeof VisionEngine === 'undefined') return;
 
   addLog(`[Vision] Analysing uploaded image (${Math.round(file.size / 1024)} KB)…`);
   if (topicsEl) topicsEl.innerHTML = '<div class="spinner"></div>';
+  if (captionsEl) captionsEl.innerHTML = '';
+  if (identifiedEl) identifiedEl.innerHTML = '';
   if (previewWrap) previewWrap.style.display = 'block';
   if (dropzone) dropzone.classList.add('has-image');
 
@@ -898,32 +1089,71 @@ async function analyzeUploadedImage(file) {
 
     const result = await VisionEngine.analyzeFile(file);
 
-    // Scene tags
+    // Detected scene banner
+    if (identifiedEl && result.identified) {
+      const alt = (result.alternatives || []).filter(a => !a.includes(result.identified.label));
+      identifiedEl.innerHTML = `
+        <span style="font-size:16px;">${result.identified.emoji}</span>
+        <span>Detected scene: <span class="vi-label">${escapeHtml(result.identified.label)}</span></span>
+        <span class="vi-conf">${result.identified.confidence}% match</span>
+        ${alt.length ? `<span class="vi-alt">Could also be: ${alt.map(escapeHtml).join(', ')}</span>` : ''}`;
+    }
+
+    // Scene descriptor tags
     if (tagsEl) {
       tagsEl.innerHTML = result.tags.map(t => `<span class="vision-tag">🔎 ${escapeHtml(t)}</span>`).join('');
     }
 
-    // Topic suggestions as tappable chips
+    // Topic suggestions — tap to start a draft on that topic
     if (topicsEl) {
       topicsEl.innerHTML = result.topics.map(topic => `
         <div class="topic-chip" data-topic="${escapeHtml(topic)}">
           <span class="chip-arrow">›</span>
           <span>${escapeHtml(topic)}</span>
         </div>`).join('');
-
       topicsEl.querySelectorAll('.topic-chip').forEach(chip => {
-        chip.addEventListener('click', () => {
-          loadTopicIntoEditor(chip.getAttribute('data-topic'));
-        });
+        chip.addEventListener('click', () => loadTopicIntoEditor(chip.getAttribute('data-topic')));
       });
     }
 
-    addLog(`[Vision] Suggested ${result.topics.length} topics from image cues: ${result.tags.join(', ')}`);
-    showToastNotification('Picture analysed', 'Tap a suggested topic to start drafting.');
+    // Caption suggestions — tap to drop the line straight into the post
+    if (captionsEl) {
+      captionsEl.innerHTML = (result.captions || []).map(cap => `
+        <div class="topic-chip" data-caption="${escapeHtml(cap)}">
+          <span class="chip-arrow">✍️</span>
+          <span>${escapeHtml(cap)}</span>
+        </div>`).join('');
+      captionsEl.querySelectorAll('.topic-chip').forEach(chip => {
+        chip.addEventListener('click', () => insertCaption(chip.getAttribute('data-caption')));
+      });
+    }
+
+    addLog(`[Vision] Detected "${result.identified.label}" (${result.identified.confidence}%); ${result.topics.length} topics, ${result.captions.length} captions`);
+    showToastNotification('Picture analysed', `Looks like: ${result.identified.label}. Tap a topic or caption to use it.`);
   } catch (err) {
     addLog(`[Vision] Image analysis failed: ${err.message}`);
     if (topicsEl) topicsEl.innerHTML = `<div style="color:var(--text-muted);font-size:12px;">Could not analyse that image. Try another photo.</div>`;
   }
+}
+
+// Drop a ready-made caption line into the post workspace and jump to it.
+function insertCaption(caption) {
+  const textarea = document.getElementById('post-editor');
+  if (!textarea) return;
+  appState.activeTemplateId = null;
+  document.querySelectorAll('.template-item').forEach(el => el.classList.remove('active'));
+
+  let current = textarea.value.trim();
+  const defaultTags = getHashtagString(3);
+  textarea.value = current
+    ? `${current}\n\n${caption}`
+    : `${caption}\n\n${defaultTags}`;
+  updateCharCount(textarea.value);
+  LearningEngine.trackEvent('draft_start');
+  addLog('[Vision] Inserted caption into post');
+  switchTab('scheduler');
+  textarea.focus();
+  showToastNotification('Caption added', 'Dropped into your Post Workspace.');
 }
 
 // Daily Notification Scheduler logic (Check every 10 seconds)

@@ -88,6 +88,28 @@
 
         <div class="ios-card">
           <div class="ios-card-header">
+            <h2 class="ios-card-title">🏷️ Tags & Mentions</h2>
+            <span style="font-size: 11px; color: var(--text-muted);">Tap to insert</span>
+          </div>
+          <div class="ios-card-subtitle">Manage your hashtags and @mentions (people, companies, organisations). Tap a chip to add it to the post; tap × to remove it from your library.</div>
+
+          <div class="tagmgr-section-label"># Hashtags</div>
+          <div class="tag-chip-wrap" id="hashtag-list"><!-- loaded in app.js --></div>
+          <div class="tag-add-row">
+            <input type="text" id="hashtag-input" class="tag-add-input" placeholder="Add hashtag (e.g. SoilHealth)">
+            <button id="hashtag-add-btn" class="ios-btn tag-add-btn">Add</button>
+          </div>
+
+          <div class="tagmgr-section-label" style="margin-top: 14px;">@ Mentions</div>
+          <div class="tag-chip-wrap" id="mention-list"><!-- loaded in app.js --></div>
+          <div class="tag-add-row">
+            <input type="text" id="mention-input" class="tag-add-input" placeholder="Add mention (e.g. Ekosight)">
+            <button id="mention-add-btn" class="ios-btn tag-add-btn">Add</button>
+          </div>
+        </div>
+
+        <div class="ios-card">
+          <div class="ios-card-header">
             <h2 class="ios-card-title">⏳ Recent Postings</h2>
           </div>
           <div class="post-history-list" id="history-list">
@@ -321,9 +343,12 @@
 
           <div class="upload-preview-wrap" id="upload-preview-wrap" style="display: none;">
             <img id="upload-preview" class="upload-preview" alt="Uploaded preview">
+            <div class="vision-identified" id="vision-identified"><!-- detected scene --></div>
             <div class="vision-tags" id="vision-tags"></div>
-            <div style="font-size: 12px; color: var(--text-secondary); font-weight: 600; margin-bottom: 2px;">Suggested post topics:</div>
+            <div class="vision-section-label">💡 Suggested post topics</div>
             <div class="topic-chip-list" id="vision-topics"></div>
+            <div class="vision-section-label">✍️ Captions to go with this photo</div>
+            <div class="topic-chip-list" id="vision-captions"></div>
           </div>
         </div>
 
