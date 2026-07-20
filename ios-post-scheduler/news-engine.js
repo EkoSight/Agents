@@ -91,11 +91,19 @@ const NewsEngine = (() => {
   }
 
   // ---- Fetch + parse -------------------------------------------------------
+  // Fetch with a hard timeout so a slow/blocked proxy can never hang the UI.
+  function fetchWithTimeout(url, ms = 7000) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), ms);
+    return fetch(url, { cache: 'no-store', signal: controller.signal })
+      .finally(() => clearTimeout(timer));
+  }
+
   async function fetchFeed(source) {
     let lastErr = null;
     for (const proxy of CORS_PROXIES) {
       try {
-        const res = await fetch(proxy(source.url), { cache: 'no-store' });
+        const res = await fetchWithTimeout(proxy(source.url));
         if (!res.ok) throw new Error('HTTP ' + res.status);
         const xml = await res.text();
         return parseRss(xml, source.region);
